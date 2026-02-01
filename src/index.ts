@@ -52,13 +52,13 @@ export * from './file/file-identifier';
 export * from './file/format-converter';
 
 // ============================================================================
-// 网络通信模块导出（阶段4完成后取消注释）
+// 网络通信模块导出
 // ============================================================================
 
-// export * from './network/http-client';
-// export * from './network/download-manager';
-// export * from './network/cache-manager';
-// export * from './network/protocol-adapter';
+export * from './network/http-client';
+export * from './network/download-manager';
+export * from './network/cache-manager';
+export * from './network/protocol-adapter';
 
 // ============================================================================
 // 界面组件模块导出（阶段5完成后取消注释）
