@@ -61,45 +61,51 @@ export * from './network/cache-manager';
 export * from './network/protocol-adapter';
 
 // ============================================================================
-// 界面组件模块导出（阶段5完成后取消注释）
+// 界面组件模块导出
 // ============================================================================
 
-// export * from './ui/controls';
-// export * from './ui/window-manager';
-// export * from './ui/drag-drop-system';
-// export * from './ui/iframe-wrapper';
+export * from './ui/controls';
+export * from './ui/window-manager';
+export * from './ui/drag-drop-system';
+export * from './ui/iframe-wrapper';
 
 // ============================================================================
-// 文本处理模块导出（阶段6完成后取消注释）
+// 文本处理模块导出
 // ============================================================================
 
-// export * from './text/rich-text-renderer';
-// export * from './text/markdown-parser';
-// export * from './text/code-highlighter';
-// export * from './text/text-editor';
+export {
+  RichTextRenderer as ChipsRichTextRenderer,
+  richTextRenderer as chipsRichTextRenderer,
+  type RichTextNode,
+  type RichTextNodeType,
+  type RenderOptions as RichTextRenderOptions,
+} from './text/rich-text-renderer';
+export * from './text/markdown-parser';
+export * from './text/code-highlighter';
+export * from './text/text-editor';
 
 // ============================================================================
-// 媒体组件模块导出（阶段7完成后取消注释）
+// 媒体组件模块导出
 // ============================================================================
 
-// export * from './media/video-player';
-// export * from './media/audio-player';
-// export * from './media/image-viewer';
-// export * from './media/model-3d-renderer';
+export * from './media/video-player';
+export * from './media/audio-player';
+export * from './media/image-viewer';
+export * from './media/model-3d-renderer';
 
 // ============================================================================
-// 核心运行环境模块导出（阶段8完成后取消注释）
+// 核心运行环境模块导出
 // ============================================================================
 
-// export * from './runtime/runtime-manager';
-// export * from './runtime/electron-framework';
-// export * from './runtime/chromium-core';
+export * from './runtime/runtime-manager';
+export * from './runtime/electron-framework';
+export * from './runtime/chromium-core';
 
 // ============================================================================
-// 卡片渲染模块导出（阶段9完成后取消注释）
+// 卡片渲染模块导出
 // ============================================================================
 
-// export * from './renderer/card-renderer';
-// export * from './renderer/base-card-renderers';
-// export * from './renderer/box-renderer';
-// export * from './renderer/theme-engine';
+export * from './renderer/card-renderer';
+export * from './renderer/base-card-renderers';
+export * from './renderer/box-renderer';
+export * from './renderer/theme-engine';
