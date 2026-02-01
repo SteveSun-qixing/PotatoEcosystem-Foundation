@@ -35,13 +35,13 @@ export const VERSION_INFO = {
 export * from './core';
 
 // ============================================================================
-// 系统服务模块导出（阶段2完成后取消注释）
+// 系统服务模块导出
 // ============================================================================
 
-// export * from './system/data-serializer';
-// export * from './system/log-system';
-// export * from './system/i18n-system';
-// export * from './system/config-manager';
+export * from './system/data-serializer';
+export * from './system/log-system';
+export * from './system/i18n-system';
+export * from './system/config-manager';
 
 // ============================================================================
 // 文件处理模块导出（阶段3完成后取消注释）
