@@ -44,12 +44,12 @@ export * from './system/i18n-system';
 export * from './system/config-manager';
 
 // ============================================================================
-// 文件处理模块导出（阶段3完成后取消注释）
+// 文件处理模块导出
 // ============================================================================
 
-// export * from './file/zip-processor';
-// export * from './file/file-identifier';
-// export * from './file/format-converter';
+export * from './file/zip-processor';
+export * from './file/file-identifier';
+export * from './file/format-converter';
 
 // ============================================================================
 // 网络通信模块导出（阶段4完成后取消注释）
