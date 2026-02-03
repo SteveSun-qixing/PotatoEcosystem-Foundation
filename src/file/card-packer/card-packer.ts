@@ -649,3 +649,33 @@ export class CardPacker implements ICardPacker {
     return sum.toString(16).padStart(8, '0');
   }
 }
+
+// ============================================================================
+// 工厂函数
+// ============================================================================
+
+/**
+ * 创建 CardPacker 实例
+ *
+ * @description
+ * 便捷的工厂函数，用于创建 CardPacker 实例。
+ * 需要传入 ZIPProcessor 实例和文件系统适配器。
+ *
+ * @param zipProcessor - ZIP 处理器实例
+ * @param fileSystem - 文件系统适配器
+ * @returns CardPacker 实例
+ *
+ * @example
+ * ```typescript
+ * import { createCardPacker, ZIPProcessor } from '@chips/foundation';
+ *
+ * const packer = createCardPacker(new ZIPProcessor(), myFileSystemAdapter);
+ * await packer.pack('/source', '/output.card');
+ * ```
+ */
+export function createCardPacker(
+  zipProcessor: ZIPProcessor,
+  fileSystem: FileSystemAdapter
+): CardPacker {
+  return new CardPacker(zipProcessor, fileSystem);
+}

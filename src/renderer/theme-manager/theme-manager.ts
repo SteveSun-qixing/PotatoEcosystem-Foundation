@@ -5,9 +5,11 @@
  * 负责整个薯片生态的主题登记、存储和分发
  */
 
-import { ChipsError, ErrorCodes } from '../../core/errors';
+import { ChipsError } from '../../core/errors';
 import { ZIPProcessor } from '../../file/zip-processor/zip-processor';
 import { YAMLParser } from '../../system/data-serializer/parsers/yaml-parser';
+import { LogSystem, createLogger } from '../../system/log-system/log-system';
+import { I18nSystem, i18nSystem } from '../../system/i18n-system/i18n-system';
 import {
   IThemeManager,
   ThemeInfo,
@@ -17,6 +19,8 @@ import {
   ThemeUnregisterResult,
   ThemeConfigFile,
   ThemeAsset,
+  ThemeErrorCodes,
+  ThemeI18nKeys,
   DEFAULT_THEME_ID,
   DEFAULT_THEME_INFO,
 } from './types';
@@ -89,6 +93,20 @@ export interface ThemeFileSystemAdapter {
  * const styles = await manager.getThemeStyles('薯片官方:默认主题', 'video-card');
  * ```
  */
+/**
+ * ThemeManager 配置选项
+ */
+export interface ThemeManagerOptions {
+  /** 文件系统适配器 */
+  fileSystem: ThemeFileSystemAdapter;
+  /** ZIP 处理器实例（可选） */
+  zipProcessor?: ZIPProcessor;
+  /** 日志系统实例（可选） */
+  logger?: LogSystem;
+  /** 国际化系统实例（可选） */
+  i18n?: I18nSystem;
+}
+
 export class ThemeManager implements IThemeManager {
   /** 主题注册表 */
   private registry: Map<string, ThemePackage> = new Map();
@@ -104,15 +122,40 @@ export class ThemeManager implements IThemeManager {
   private zipProcessor: ZIPProcessor;
   /** YAML 解析器 */
   private yamlParser: YAMLParser;
+  /** 日志系统 */
+  private logger: LogSystem;
+  /** 国际化系统 */
+  private i18n: I18nSystem;
 
   /**
    * 创建主题管理器实例
-   * @param fileSystem - 文件系统适配器
-   * @param zipProcessor - ZIP 处理器实例
+   * @param fileSystem - 文件系统适配器（兼容旧接口）
+   * @param zipProcessor - ZIP 处理器实例（可选，兼容旧接口）
    */
-  constructor(fileSystem: ThemeFileSystemAdapter, zipProcessor?: ZIPProcessor) {
-    this.fs = fileSystem;
-    this.zipProcessor = zipProcessor || new ZIPProcessor();
+  constructor(fileSystem: ThemeFileSystemAdapter, zipProcessor?: ZIPProcessor);
+  /**
+   * 创建主题管理器实例
+   * @param options - 配置选项
+   */
+  constructor(options: ThemeManagerOptions);
+  constructor(
+    fileSystemOrOptions: ThemeFileSystemAdapter | ThemeManagerOptions,
+    zipProcessor?: ZIPProcessor
+  ) {
+    // 兼容两种构造方式
+    if ('fileSystem' in fileSystemOrOptions) {
+      // 新接口
+      this.fs = fileSystemOrOptions.fileSystem;
+      this.zipProcessor = fileSystemOrOptions.zipProcessor || new ZIPProcessor();
+      this.logger = fileSystemOrOptions.logger?.child('ThemeManager') || createLogger('ThemeManager');
+      this.i18n = fileSystemOrOptions.i18n || i18nSystem;
+    } else {
+      // 兼容旧接口
+      this.fs = fileSystemOrOptions;
+      this.zipProcessor = zipProcessor || new ZIPProcessor();
+      this.logger = createLogger('ThemeManager');
+      this.i18n = i18nSystem;
+    }
     this.yamlParser = new YAMLParser();
   }
 
@@ -125,11 +168,15 @@ export class ThemeManager implements IThemeManager {
    * @param themesDir - 主题存储目录
    */
   async initialize(themesDir: string): Promise<void> {
+    const startTime = Date.now();
+    this.logger.info('Initializing ThemeManager', { data: { themesDir } });
+
     this.themesDir = themesDir;
 
     // 确保目录存在
     if (!(await this.fs.exists(themesDir))) {
       await this.fs.mkdir(themesDir, { recursive: true });
+      this.logger.debug('Created themes directory', { data: { themesDir } });
     }
 
     // 注册默认主题
@@ -139,6 +186,14 @@ export class ThemeManager implements IThemeManager {
     await this.scanThemesDirectory();
 
     this.initialized = true;
+
+    this.logger.info('ThemeManager initialized', {
+      data: {
+        themesDir,
+        themeCount: this.registry.size,
+        duration_ms: Date.now() - startTime,
+      },
+    });
   }
 
   /**
@@ -185,6 +240,14 @@ export class ThemeManager implements IThemeManager {
   async registerTheme(theme: ThemePackage): Promise<ThemeRegisterResult> {
     this.ensureInitialized();
 
+    this.logger.debug('Registering theme', {
+      data: {
+        themeId: theme.id,
+        version: theme.version,
+        publisher: theme.publisher,
+      },
+    });
+
     // 验证主题配置
     this.validateThemePackage(theme);
 
@@ -194,10 +257,17 @@ export class ThemeManager implements IThemeManager {
 
     // 如果是更新，检查版本
     if (existing && !this.isNewerVersion(theme.version, existing.version)) {
+      this.logger.warn('Theme version conflict', {
+        data: {
+          themeId: theme.id,
+          existingVersion: existing.version,
+          newVersion: theme.version,
+        },
+      });
       return {
         success: false,
         themeId: theme.id,
-        message: 'Theme version is not newer than existing version',
+        message: this.i18n.t(ThemeI18nKeys.ERROR_VERSION_CONFLICT),
         isUpdate: true,
       };
     }
@@ -205,10 +275,21 @@ export class ThemeManager implements IThemeManager {
     // 注册主题
     this.registry.set(theme.id, theme);
 
+    const message = isUpdate
+      ? this.i18n.t(ThemeI18nKeys.MSG_THEME_UPDATED)
+      : this.i18n.t(ThemeI18nKeys.MSG_THEME_REGISTERED);
+
+    this.logger.info(isUpdate ? 'Theme updated' : 'Theme registered', {
+      data: {
+        themeId: theme.id,
+        version: theme.version,
+      },
+    });
+
     return {
       success: true,
       themeId: theme.id,
-      message: isUpdate ? 'Theme updated successfully' : 'Theme registered successfully',
+      message,
       isUpdate,
     };
   }
@@ -222,23 +303,27 @@ export class ThemeManager implements IThemeManager {
   async unregisterTheme(themeId: string): Promise<ThemeUnregisterResult> {
     this.ensureInitialized();
 
+    this.logger.debug('Unregistering theme', { data: { themeId } });
+
     const theme = this.registry.get(themeId);
 
     // 检查主题是否存在
     if (!theme) {
+      this.logger.warn('Theme not found for unregistration', { data: { themeId } });
       return {
         success: false,
         themeId,
-        message: 'Theme not found',
+        message: this.i18n.t(ThemeI18nKeys.ERROR_THEME_NOT_FOUND),
       };
     }
 
     // 系统主题不能卸载
     if (theme.isSystem) {
+      this.logger.warn('Attempted to unregister system theme', { data: { themeId } });
       return {
         success: false,
         themeId,
-        message: 'Cannot unregister system theme',
+        message: this.i18n.t(ThemeI18nKeys.ERROR_CANNOT_UNINSTALL_SYSTEM),
       };
     }
 
@@ -249,16 +334,24 @@ export class ThemeManager implements IThemeManager {
     if (theme.storagePath && (await this.fs.exists(theme.storagePath))) {
       try {
         await this.fs.rmdir(theme.storagePath, { recursive: true });
+        this.logger.debug('Deleted theme files', { data: { storagePath: theme.storagePath } });
       } catch (error) {
         // 文件删除失败不影响注册表操作
-        console.warn(`Failed to delete theme files: ${error}`);
+        this.logger.warn('Failed to delete theme files', {
+          data: {
+            storagePath: theme.storagePath,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
       }
     }
+
+    this.logger.info('Theme unregistered', { data: { themeId } });
 
     return {
       success: true,
       themeId,
-      message: 'Theme unregistered successfully',
+      message: this.i18n.t(ThemeI18nKeys.MSG_THEME_UNREGISTERED),
     };
   }
 
@@ -303,12 +396,16 @@ export class ThemeManager implements IThemeManager {
   async storeTheme(themeData: Uint8Array, targetDir?: string): Promise<string> {
     this.ensureInitialized();
 
+    const startTime = Date.now();
+    this.logger.debug('Storing theme package', { data: { size: themeData.length } });
+
     // 验证 ZIP 格式
     const isValid = await this.zipProcessor.validate(themeData);
     if (!isValid) {
+      this.logger.error('Invalid theme package format', new Error('Not a valid ZIP file'));
       throw new ChipsError(
-        ErrorCodes.INVALID_FILE_FORMAT,
-        'Invalid theme package format',
+        ThemeErrorCodes.INVALID_PACKAGE,
+        this.i18n.t(ThemeI18nKeys.ERROR_INVALID_PACKAGE),
         { reason: 'Not a valid ZIP file' }
       );
     }
@@ -317,11 +414,12 @@ export class ThemeManager implements IThemeManager {
     let configContent: string;
     try {
       configContent = await this.zipProcessor.extractText(themeData, 'theme.yaml');
-    } catch {
+    } catch (error) {
+      this.logger.error('Missing theme.yaml in package', error instanceof Error ? error : new Error(String(error)));
       throw new ChipsError(
-        ErrorCodes.INVALID_FILE_FORMAT,
-        'Invalid theme package: missing theme.yaml',
-        {}
+        ThemeErrorCodes.MISSING_CONFIG,
+        this.i18n.t(ThemeI18nKeys.ERROR_MISSING_CONFIG),
+        { file: 'theme.yaml' }
       );
     }
 
@@ -331,6 +429,13 @@ export class ThemeManager implements IThemeManager {
 
     // 确定目标路径
     const themePath = targetDir || this.fs.join(this.themesDir, config.publisher, config.id.split(':')[1] || config.name);
+
+    this.logger.debug('Theme storage path determined', {
+      data: {
+        themeId: config.id,
+        themePath,
+      },
+    });
 
     // 确保目录存在
     if (!(await this.fs.exists(themePath))) {
@@ -350,16 +455,34 @@ export class ThemeManager implements IThemeManager {
       await this.fs.writeFile(fullPath, content);
     }
 
+    this.logger.debug('Theme files extracted', {
+      data: {
+        fileCount: files.size,
+        themePath,
+      },
+    });
+
     // 加载并注册主题
     const theme = await this.loadThemeFromDirectory(themePath);
     if (theme) {
       await this.registerTheme(theme);
+
+      this.logger.info('Theme stored successfully', {
+        data: {
+          themeId: theme.id,
+          version: theme.version,
+          themePath,
+          duration_ms: Date.now() - startTime,
+        },
+      });
+
       return theme.id;
     }
 
+    this.logger.error('Failed to load theme after extraction', new Error('Theme load failed'), { data: { path: themePath } });
     throw new ChipsError(
-      ErrorCodes.MODULE_LOAD_ERROR,
-      'Failed to load theme after extraction',
+      ThemeErrorCodes.LOAD_FAILED,
+      this.i18n.t(ThemeI18nKeys.ERROR_LOAD_FAILED),
       { path: themePath }
     );
   }
@@ -399,6 +522,7 @@ export class ThemeManager implements IThemeManager {
 
     const theme = this.registry.get(themeId);
     if (!theme || !theme.storagePath) {
+      this.logger.debug('Theme not found for asset resolution', { data: { themeId } });
       return null;
     }
 
@@ -407,8 +531,23 @@ export class ThemeManager implements IThemeManager {
 
     // 验证解析后的路径仍在主题目录内
     if (!resolvedPath.startsWith(theme.storagePath)) {
+      this.logger.warn('Path traversal attempt detected', {
+        data: {
+          themeId,
+          relativePath,
+          resolvedPath,
+        },
+      });
       return null;
     }
+
+    this.logger.debug('Asset path resolved', {
+      data: {
+        themeId,
+        relativePath,
+        resolvedPath,
+      },
+    });
 
     return resolvedPath;
   }
@@ -418,6 +557,9 @@ export class ThemeManager implements IThemeManager {
    */
   async refresh(): Promise<void> {
     this.ensureInitialized();
+
+    this.logger.info('Refreshing theme registry');
+    const startTime = Date.now();
 
     // 保留系统主题
     const systemThemes = Array.from(this.registry.entries()).filter(
@@ -434,6 +576,13 @@ export class ThemeManager implements IThemeManager {
 
     // 重新扫描
     await this.scanThemesDirectory();
+
+    this.logger.info('Theme registry refreshed', {
+      data: {
+        themeCount: this.registry.size,
+        duration_ms: Date.now() - startTime,
+      },
+    });
   }
 
   // ============================================================================
@@ -446,8 +595,8 @@ export class ThemeManager implements IThemeManager {
   private ensureInitialized(): void {
     if (!this.initialized) {
       throw new ChipsError(
-        ErrorCodes.MODULE_INIT_ERROR,
-        'ThemeManager not initialized. Call initialize() first.',
+        ThemeErrorCodes.NOT_INITIALIZED,
+        this.i18n.t(ThemeI18nKeys.ERROR_NOT_INITIALIZED),
         {}
       );
     }
@@ -530,11 +679,18 @@ export class ThemeManager implements IThemeManager {
    */
   private async scanThemesDirectory(): Promise<void> {
     if (!(await this.fs.exists(this.themesDir))) {
+      this.logger.debug('Themes directory does not exist, skipping scan', {
+        data: { themesDir: this.themesDir },
+      });
       return;
     }
 
+    this.logger.debug('Scanning themes directory', { data: { themesDir: this.themesDir } });
+
     // 遍历发行商目录
     const publishers = await this.fs.readDir(this.themesDir);
+    let loadedCount = 0;
+    let errorCount = 0;
 
     for (const publisher of publishers) {
       const publisherPath = this.fs.join(this.themesDir, publisher);
@@ -558,13 +714,33 @@ export class ThemeManager implements IThemeManager {
           const theme = await this.loadThemeFromDirectory(themePath);
           if (theme) {
             this.registry.set(theme.id, theme);
+            loadedCount++;
+            this.logger.debug('Loaded theme', {
+              data: {
+                themeId: theme.id,
+                publisher: theme.publisher,
+              },
+            });
           }
         } catch (error) {
-          // 记录错误但继续扫描
-          console.warn(`Failed to load theme from ${themePath}:`, error);
+          errorCount++;
+          this.logger.warn('Failed to load theme', {
+            data: {
+              themePath,
+              error: error instanceof Error ? error.message : String(error),
+            },
+          });
         }
       }
     }
+
+    this.logger.debug('Themes directory scan completed', {
+      data: {
+        loadedCount,
+        errorCount,
+        totalRegistered: this.registry.size,
+      },
+    });
   }
 
   /**
@@ -678,17 +854,20 @@ export class ThemeManager implements IThemeManager {
    * 验证主题包配置
    */
   private validateThemePackage(theme: ThemePackage): void {
-    if (!theme.id) {
-      throw new ChipsError(ErrorCodes.INVALID_INPUT, 'Theme id is required', {});
-    }
-    if (!theme.name) {
-      throw new ChipsError(ErrorCodes.INVALID_INPUT, 'Theme name is required', {});
-    }
-    if (!theme.version) {
-      throw new ChipsError(ErrorCodes.INVALID_INPUT, 'Theme version is required', {});
-    }
-    if (!theme.publisher) {
-      throw new ChipsError(ErrorCodes.INVALID_INPUT, 'Theme publisher is required', {});
+    const missingFields: string[] = [];
+
+    if (!theme.id) missingFields.push('id');
+    if (!theme.name) missingFields.push('name');
+    if (!theme.version) missingFields.push('version');
+    if (!theme.publisher) missingFields.push('publisher');
+
+    if (missingFields.length > 0) {
+      this.logger.warn('Theme validation failed', { data: { missingFields } });
+      throw new ChipsError(
+        ThemeErrorCodes.VALIDATION_FAILED,
+        this.i18n.t(ThemeI18nKeys.ERROR_VALIDATION_FAILED),
+        { missingFields }
+      );
     }
   }
 
@@ -696,20 +875,19 @@ export class ThemeManager implements IThemeManager {
    * 验证主题配置文件
    */
   private validateThemeConfig(config: ThemeConfigFile): void {
-    if (!config.id) {
-      throw new ChipsError(ErrorCodes.INVALID_INPUT, 'Theme config: id is required', {});
-    }
-    if (!config.name) {
-      throw new ChipsError(ErrorCodes.INVALID_INPUT, 'Theme config: name is required', {});
-    }
-    if (!config.version) {
-      throw new ChipsError(ErrorCodes.INVALID_INPUT, 'Theme config: version is required', {});
-    }
-    if (!config.publisher) {
+    const missingFields: string[] = [];
+
+    if (!config.id) missingFields.push('id');
+    if (!config.name) missingFields.push('name');
+    if (!config.version) missingFields.push('version');
+    if (!config.publisher) missingFields.push('publisher');
+
+    if (missingFields.length > 0) {
+      this.logger.warn('Theme config validation failed', { data: { missingFields } });
       throw new ChipsError(
-        ErrorCodes.INVALID_INPUT,
-        'Theme config: publisher is required',
-        {}
+        ThemeErrorCodes.MISSING_CONFIG,
+        this.i18n.t(ThemeI18nKeys.ERROR_MISSING_CONFIG),
+        { missingFields }
       );
     }
   }

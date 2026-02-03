@@ -89,6 +89,11 @@ export interface CardValidationResult {
 /**
  * 卡片文件结构规范
  * 定义 .card 文件夹应包含的标准结构
+ *
+ * 根据卡片文件格式设计文档：
+ * - .card/ 配置目录包含 metadata.yaml、structure.yaml、cover.html
+ * - content/ 存放基础卡片的配置文件
+ * - 资源文件直接放在卡片根目录（不使用子文件夹）
  */
 export interface CardFileStructure {
   /** .card 配置文件夹 */
@@ -97,21 +102,26 @@ export interface CardFileStructure {
   requiredFiles: string[];
   /** 可选的配置文件 */
   optionalFiles: string[];
-  /** 内容文件夹 */
+  /** 内容文件夹（存放基础卡片配置） */
   contentDir: 'content';
-  /** 资源文件夹 */
-  assetsDir: 'assets';
+  /** 封面资源文件夹 */
+  coverDir: 'cardcover';
 }
 
 /**
  * 默认卡片文件结构
+ *
+ * 按照卡片文件格式设计规范：
+ * - 必需文件：metadata.yaml（元数据）、structure.yaml（结构定义）
+ * - 可选文件：cover.html（封面）
+ * - 资源文件直接放在根目录，不使用分类子文件夹
  */
 export const DEFAULT_CARD_STRUCTURE: CardFileStructure = {
   configDir: '.card',
   requiredFiles: ['metadata.yaml', 'structure.yaml'],
-  optionalFiles: ['cover.html', 'theme.yaml'],
+  optionalFiles: ['cover.html'],
   contentDir: 'content',
-  assetsDir: 'assets',
+  coverDir: 'cardcover',
 };
 
 // ============================================================================

@@ -4,6 +4,72 @@
  */
 
 // ============================================================================
+// 错误码定义
+// ============================================================================
+
+/**
+ * 主题管理器错误码
+ * 遵循 Chips 生态错误码规范：THEME-xxxx
+ */
+export const ThemeErrorCodes = {
+  /** 主题管理器未初始化 */
+  NOT_INITIALIZED: 'THEME-1001',
+  /** 无效的主题包格式 */
+  INVALID_PACKAGE: 'THEME-1002',
+  /** 主题配置缺失必需字段 */
+  MISSING_CONFIG: 'THEME-1003',
+  /** 主题未找到 */
+  THEME_NOT_FOUND: 'THEME-1004',
+  /** 无法卸载系统主题 */
+  CANNOT_UNINSTALL_SYSTEM: 'THEME-1005',
+  /** 版本冲突 */
+  VERSION_CONFLICT: 'THEME-1006',
+  /** 主题存储失败 */
+  STORE_FAILED: 'THEME-1007',
+  /** 主题加载失败 */
+  LOAD_FAILED: 'THEME-1008',
+  /** 资源路径无效 */
+  INVALID_ASSET_PATH: 'THEME-1009',
+  /** 主题验证失败 */
+  VALIDATION_FAILED: 'THEME-1010',
+} as const;
+
+export type ThemeErrorCode = (typeof ThemeErrorCodes)[keyof typeof ThemeErrorCodes];
+
+// ============================================================================
+// 国际化词汇 key 定义
+// ============================================================================
+
+/**
+ * 主题管理器国际化词汇 key
+ * 开发阶段使用，打包时由系统替换为编码
+ */
+export const ThemeI18nKeys = {
+  // 错误消息
+  ERROR_NOT_INITIALIZED: 'theme.error.not_initialized',
+  ERROR_INVALID_PACKAGE: 'theme.error.invalid_package',
+  ERROR_MISSING_CONFIG: 'theme.error.missing_config',
+  ERROR_THEME_NOT_FOUND: 'theme.error.theme_not_found',
+  ERROR_CANNOT_UNINSTALL_SYSTEM: 'theme.error.cannot_uninstall_system',
+  ERROR_VERSION_CONFLICT: 'theme.error.version_conflict',
+  ERROR_STORE_FAILED: 'theme.error.store_failed',
+  ERROR_LOAD_FAILED: 'theme.error.load_failed',
+  ERROR_INVALID_ASSET_PATH: 'theme.error.invalid_asset_path',
+  ERROR_VALIDATION_FAILED: 'theme.error.validation_failed',
+
+  // 操作消息
+  MSG_THEME_REGISTERED: 'theme.message.registered',
+  MSG_THEME_UNREGISTERED: 'theme.message.unregistered',
+  MSG_THEME_UPDATED: 'theme.message.updated',
+  MSG_THEME_STORED: 'theme.message.stored',
+  MSG_INITIALIZED: 'theme.message.initialized',
+
+  // 默认主题
+  DEFAULT_THEME_NAME: 'theme.default.name',
+  DEFAULT_THEME_DESCRIPTION: 'theme.default.description',
+} as const;
+
+// ============================================================================
 // 主题基础类型
 // ============================================================================
 

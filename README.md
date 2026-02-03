@@ -29,7 +29,7 @@
 
 ## 模块清单
 
-公共基础层包含 **26个核心模块**,分为7个功能分类:
+公共基础层包含 **28个核心模块**,分为7个功能分类:
 
 ### 核心运行环境 (3个)
 
@@ -57,13 +57,14 @@
 | CodeHighlighter | 代码高亮器,为多种编程语言提供语法高亮 | [需求文档](需求文档/文本-CodeHighlighter-需求.md) | [技术文档](技术文档/文本-CodeHighlighter-技术.md) |
 | TextEditor | 文本编辑器,提供基础文本编辑功能 | [需求文档](需求文档/文本-TextEditor-需求.md) | [技术文档](技术文档/文本-TextEditor-技术.md) |
 
-### 文件处理 (3个)
+### 文件处理 (4个)
 
 | 模块 | 说明 | 需求文档 | 技术文档 |
 |------|------|----------|----------|
 | ZIPProcessor | ZIP处理器,创建和解析卡片和箱子文件 | [需求文档](需求文档/文件-ZIPProcessor-需求.md) | [技术文档](技术文档/文件-ZIPProcessor-技术.md) |
 | FileIdentifier | 文件识别器,判断文件类型 | [需求文档](需求文档/文件-FileIdentifier-需求.md) | [技术文档](技术文档/文件-FileIdentifier-技术.md) |
 | FormatConverter | 格式转换器,提供常见格式转换 | [需求文档](需求文档/文件-FormatConverter-需求.md) | [技术文档](技术文档/文件-FormatConverter-技术.md) |
+| CardPacker | 卡片打包器,将卡片文件夹打包为 .card 文件 | [需求文档](需求文档/文件-CardPacker-需求.md) | [技术文档](技术文档/文件-CardPacker-技术.md) |
 
 ### 网络通信 (4个)
 
@@ -83,7 +84,7 @@
 | DragDropSystem | 拖拽系统,处理拖动操作 | [需求文档](需求文档/界面-DragDropSystem-需求.md) | [技术文档](技术文档/界面-DragDropSystem-技术.md) |
 | IFrameWrapper | 网页框架组件,封装iframe | [需求文档](需求文档/界面-IFrameWrapper-需求.md) | [技术文档](技术文档/界面-IFrameWrapper-技术.md) |
 
-### 系统服务 (4个)
+### 系统服务 (5个)
 
 | 模块 | 说明 | 需求文档 | 技术文档 |
 |------|------|----------|----------|
@@ -91,6 +92,7 @@
 | LogSystem | 日志系统,统一日志记录 | [需求文档](需求文档/系统-LogSystem-需求.md) | [技术文档](技术文档/系统-LogSystem-技术.md) |
 | I18nSystem | 多语言系统,国际化支持 | [需求文档](需求文档/系统-I18nSystem-需求.md) | [技术文档](技术文档/系统-I18nSystem-技术.md) |
 | ConfigManager | 配置管理器,配置读写和监听 | [需求文档](需求文档/系统-ConfigManager-需求.md) | [技术文档](技术文档/系统-ConfigManager-技术.md) |
+| ThemeManager | 全局主题管理,主题登记、存储和分发 | [需求文档](需求文档/系统-ThemeManager-需求.md) | [技术文档](技术文档/系统-ThemeManager-技术.md) |
 
 ---
 
