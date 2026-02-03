@@ -50,6 +50,8 @@ export * from './system/config-manager';
 export * from './file/zip-processor';
 export * from './file/file-identifier';
 export * from './file/format-converter';
+export * from './file/card-packer';
+export * from './file/file-converter';
 
 // ============================================================================
 // 网络通信模块导出
@@ -109,3 +111,4 @@ export * from './renderer/card-renderer';
 export * from './renderer/base-card-renderers';
 export * from './renderer/box-renderer';
 export * from './renderer/theme-engine';
+export * from './renderer/theme-manager';
