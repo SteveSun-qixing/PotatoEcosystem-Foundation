@@ -46,6 +46,31 @@
       "import": "./dist/renderer/*.js",
       "require": "./dist/renderer/*.cjs",
       "types": "./dist/renderer/*.d.ts"
+    },
+    "./runtime/*": {
+      "import": "./dist/runtime/*.js",
+      "require": "./dist/runtime/*.cjs",
+      "types": "./dist/runtime/*.d.ts"
+    },
+    "./runtime/electron-framework": {
+      "import": "./dist/runtime/electron-framework/index.js",
+      "require": "./dist/runtime/electron-framework/index.cjs",
+      "types": "./dist/runtime/electron-framework/index.d.ts"
+    },
+    "./runtime/chromium-core": {
+      "import": "./dist/runtime/chromium-core/index.js",
+      "require": "./dist/runtime/chromium-core/index.cjs",
+      "types": "./dist/runtime/chromium-core/index.d.ts"
+    },
+    "./runtime/runtime-manager": {
+      "import": "./dist/runtime/runtime-manager/index.js",
+      "require": "./dist/runtime/runtime-manager/index.cjs",
+      "types": "./dist/runtime/runtime-manager/index.d.ts"
+    },
+    "./runtime/desktop-launcher": {
+      "import": "./dist/runtime/desktop-launcher/index.js",
+      "require": "./dist/runtime/desktop-launcher/index.cjs",
+      "types": "./dist/runtime/desktop-launcher/index.d.ts"
     }
   },
   "files": [
@@ -56,6 +81,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsup",
+    "build:electron": "electron-vite build",
+    "dev:electron": "electron-vite dev",
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
@@ -87,12 +114,15 @@
     "jszip": "^3.10.1"
   },
   "devDependencies": {
+    "@electron-toolkit/utils": "^3.0.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.11.0",
     "@typescript-eslint/eslint-plugin": "^6.19.0",
     "@typescript-eslint/parser": "^6.19.0",
     "@vitest/coverage-v8": "^1.2.0",
     "@vitest/ui": "^1.2.0",
+    "electron": "^29.1.0",
+    "electron-vite": "^2.0.0",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.1.0",

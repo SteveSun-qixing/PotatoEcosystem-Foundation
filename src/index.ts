@@ -100,6 +100,7 @@ export * from './media/model-3d-renderer';
 export * from './runtime/runtime-manager';
 export * from './runtime/electron-framework';
 export * from './runtime/chromium-core';
+export * from './runtime/desktop-launcher';
 
 // ============================================================================
 // 卡片渲染模块导出
