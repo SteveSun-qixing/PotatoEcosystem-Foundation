@@ -1,0 +1,114 @@
+# 文件转换器相关多语言词汇表
+
+file_converter:
+  # 通用
+  name: "文件转换器"
+  desc: "管理文件格式转换插件"
+  
+  # 状态
+  status:
+    idle: "空闲"
+    parsing: "解析中"
+    rendering: "渲染中"
+    processing: "处理中"
+    writing: "写入中"
+    completed: "已完成"
+    failed: "失败"
+    cancelled: "已取消"
+  
+  # 操作
+  actions:
+    register: "注册转换器"
+    unregister: "注销转换器"
+    convert: "转换"
+    cancel: "取消"
+    validate: "验证"
+  
+  # 消息
+  messages:
+    converter_registered: "转换器已注册: {name}"
+    converter_unregistered: "转换器已注销: {id}"
+    converter_not_found: "未找到转换器: {source} -> {target}"
+    conversion_started: "开始转换: {source} -> {target}"
+    conversion_completed: "转换完成，耗时: {duration}ms"
+    conversion_failed: "转换失败: {error}"
+    conversion_cancelled: "转换已取消"
+    task_not_found: "未找到任务: {taskId}"
+  
+  # 错误
+  errors:
+    invalid_source: "无效的转换源"
+    invalid_options: "无效的转换选项"
+    plugin_error: "插件执行错误"
+    no_converter: "没有可用的转换器"
+
+card_packer:
+  # 通用
+  name: "卡片打包器"
+  desc: "负责卡片文件夹与 .card 文件之间的转换"
+  
+  # 操作
+  actions:
+    pack: "打包"
+    unpack: "解包"
+    validate: "验证"
+    read_metadata: "读取元数据"
+  
+  # 步骤
+  steps:
+    preparing: "准备中..."
+    validating: "验证结构..."
+    collecting: "收集文件..."
+    compressing: "压缩中..."
+    writing: "写入文件..."
+    reading: "读取文件..."
+    extracting: "提取文件..."
+    completed: "完成"
+  
+  # 消息
+  messages:
+    pack_started: "开始打包卡片: {path}"
+    pack_completed: "打包完成: {output}, 耗时: {duration}ms"
+    pack_failed: "打包失败: {error}"
+    
+    unpack_started: "开始解包卡片: {path}"
+    unpack_completed: "解包完成: {output}, 提取 {count} 个文件"
+    unpack_failed: "解包失败: {error}"
+    
+    validation_success: "卡片结构验证通过"
+    validation_failed: "卡片结构验证失败"
+    
+    metadata_read: "元数据读取成功: {name}"
+    
+    collected_files: "已收集 {count} 个文件"
+  
+  # 错误
+  errors:
+    not_directory: "不是目录: {path}"
+    not_file: "不是文件: {path}"
+    folder_not_found: "卡片文件夹不存在: {path}"
+    file_not_found: "卡片文件不存在: {path}"
+    output_exists: "输出目录已存在: {path}"
+    
+    missing_required_file: "缺少必需文件: {file}"
+    invalid_structure: "无效的卡片结构"
+    invalid_metadata: "无效的元数据格式"
+    invalid_card_id: "无效的卡片 ID 格式（必须是 10 位 base62）"
+    
+    resource_not_found: "资源文件不存在: {path}"
+    resource_too_large: "资源文件过大: {path} ({size} bytes)"
+    
+    zip_create_failed: "ZIP 创建失败"
+    zip_extract_failed: "ZIP 提取失败"
+    zip_corrupted: "ZIP 文件损坏"
+    
+    path_traversal: "检测到可疑路径: {path}"
+    permission_denied: "权限不足: {path}"
+    disk_full: "磁盘空间不足"
+  
+  # 警告
+  warnings:
+    content_dir_empty: "content 目录为空或不存在"
+    resource_skipped: "跳过过大的资源文件: {file}"
+    version_mismatch: "版本不匹配: 卡片={cardVersion}, 系统={systemVersion}"
+    config_not_found: "基础卡片配置文件不存在: {file}"

@@ -7,7 +7,7 @@ export default defineConfig({
   splitting: true,
   sourcemap: true,
   clean: true,
-  treeshake: true,
+  treeshake: false, // 禁用 tree shaking，确保所有导出都包含
   minify: false,
   external: ['electron'],
   esbuildOptions(options) {

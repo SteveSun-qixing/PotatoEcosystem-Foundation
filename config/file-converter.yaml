@@ -1,0 +1,128 @@
+# 文件转换器配置
+
+file_converter:
+  # 插件加载配置
+  plugins:
+    # 插件搜索路径
+    search_paths:
+      - "${app}/plugins/converters"
+      - "${user}/chips/plugins/converters"
+    
+    # 是否自动加载插件
+    auto_load: true
+    
+    # 是否允许第三方插件
+    allow_third_party: true
+  
+  # 转换任务配置
+  tasks:
+    # 最大并发任务数
+    max_concurrent: 3
+    
+    # 任务超时时间（毫秒）
+    default_timeout: 120000
+    
+    # 任务队列大小
+    queue_size: 10
+    
+    # 是否保存任务历史
+    save_history: true
+    
+    # 历史记录保留天数
+    history_retention_days: 30
+  
+  # 缓存配置
+  cache:
+    # 是否启用缓存
+    enabled: true
+    
+    # 缓存目录
+    directory: "${temp}/chips-converter-cache"
+    
+    # 缓存大小限制（MB）
+    max_size: 1024
+    
+    # 缓存过期时间（小时）
+    ttl: 24
+  
+  # 日志配置
+  logging:
+    # 日志级别: debug, info, warn, error
+    level: "info"
+    
+    # 是否记录详细的转换信息
+    verbose: false
+    
+    # 日志文件路径
+    file: "${logs}/file-converter.log"
+    
+    # 日志轮转大小（MB）
+    max_file_size: 10
+    
+    # 保留的日志文件数
+    max_files: 5
+
+card_packer:
+  # 打包配置
+  pack:
+    # 默认压缩模式 (false = 存储模式)
+    compress: false
+    
+    # 默认资源模式
+    resource_mode: "full"
+    
+    # 是否生成校验值
+    generate_checksum: true
+    
+    # 是否验证结构
+    validate_structure: true
+    
+    # 临时文件目录
+    temp_dir: "${temp}/chips-pack"
+  
+  # 解包配置
+  unpack:
+    # 是否覆盖已存在的文件
+    overwrite: false
+    
+    # 是否验证完整性
+    validate_integrity: true
+    
+    # 解包缓冲区大小（字节）
+    buffer_size: 65536
+  
+  # 验证配置
+  validation:
+    # 是否严格模式（发现任何问题都失败）
+    strict_mode: false
+    
+    # 是否检查资源文件存在性
+    check_resources: true
+    
+    # 是否验证 YAML 格式
+    validate_yaml: true
+  
+  # 限制配置
+  limits:
+    # 单个资源文件大小限制（字节）
+    max_resource_size: 524288000  # 500MB
+    
+    # 卡片总大小限制（字节）
+    max_card_size: 2147483648  # 2GB
+    
+    # 最大文件数量
+    max_file_count: 10000
+    
+    # 最大目录深度
+    max_directory_depth: 10
+  
+  # 性能配置
+  performance:
+    # 文件收集并发数
+    collect_concurrency: 10
+    
+    # 是否使用流式处理
+    use_streams: true
+    
+    # 读取缓冲区大小（字节）
+    read_buffer_size: 65536

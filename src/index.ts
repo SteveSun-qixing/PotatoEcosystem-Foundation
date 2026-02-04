@@ -50,6 +50,9 @@ export * from './system/config-manager';
 export * from './file/zip-processor';
 export * from './file/file-identifier';
 export * from './file/format-converter';
+export * from './file/file-converter';
+export * from './file/file-naming';
+export * from './file/card-packer';
 
 // ============================================================================
 // 网络通信模块导出
