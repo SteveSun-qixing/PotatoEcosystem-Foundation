@@ -720,6 +720,8 @@ export class WebViewWrapper implements IWebView {
 export class ChromiumCore implements IChromiumCore {
   private webViews: Map<string, IWebView> = new Map();
   private ipcHandlers: Map<string, Set<(viewId: string, data: unknown) => void>> = new Map();
+  private ipcRequestHandlers: Map<string, Set<(data: unknown) => unknown | Promise<unknown>>> =
+    new Map();
   private defaultConfig: WebViewConfig;
 
   constructor(config?: WebViewConfig) {
@@ -784,6 +786,47 @@ export class ChromiumCore implements IChromiumCore {
     return () => {
       this.ipcHandlers.get(channel)?.delete(handler);
     };
+  }
+
+  onIPC(channel: string, handler: (data: unknown) => unknown | Promise<unknown>): () => void {
+    if (!this.ipcRequestHandlers.has(channel)) {
+      this.ipcRequestHandlers.set(channel, new Set());
+    }
+    this.ipcRequestHandlers.get(channel)!.add(handler);
+
+    return () => {
+      this.ipcRequestHandlers.get(channel)?.delete(handler);
+    };
+  }
+
+  sendIPC(channel: string, data: unknown): void {
+    const handlers = this.ipcRequestHandlers.get(channel);
+    if (!handlers) {
+      return;
+    }
+    for (const handler of handlers) {
+      try {
+        void handler(data);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error(`Error handling IPC message on channel ${channel}:`, error);
+      }
+    }
+  }
+
+  async invokeIPC<T = unknown>(channel: string, data: unknown): Promise<T> {
+    const handlers = this.ipcRequestHandlers.get(channel);
+    const handler = handlers ? Array.from(handlers.values())[0] : null;
+
+    if (!handler) {
+      throw new Error(`No IPC handler registered for channel: ${channel}`);
+    }
+
+    try {
+      return (await handler(data)) as T;
+    } catch (error) {
+      throw error;
+    }
   }
 
   /**

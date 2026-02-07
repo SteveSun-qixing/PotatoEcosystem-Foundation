@@ -233,6 +233,65 @@ describe('CardPacker', () => {
       expect(result.valid).toBe(false);
       expect(result.errors?.some((e) => e.field === 'metadata.card_id')).toBe(true);
     });
+
+    it('should reject non-standard base card content format', async () => {
+      const cardDir = path.join(testDir, 'invalid-content-format');
+      await createTestCardFolder(cardDir);
+
+      await fs.writeFile(
+        path.join(cardDir, '.card/structure.yaml'),
+        `structure:
+  - id: "base123456A"
+    type: "RichTextCard"
+manifest:
+  card_count: 1
+  resource_count: 0
+  resources: []
+`
+      );
+
+      await fs.writeFile(
+        path.join(cardDir, 'content/base123456A.yaml'),
+        `type: "RichTextCard"
+content_text: "hello"
+`
+      );
+
+      const result = await packer.validate(cardDir);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors?.some((e) => e.field === 'content.base123456A.data')).toBe(true);
+    });
+
+    it('should reject type mismatch between structure and content', async () => {
+      const cardDir = path.join(testDir, 'invalid-content-type-mismatch');
+      await createTestCardFolder(cardDir);
+
+      await fs.writeFile(
+        path.join(cardDir, '.card/structure.yaml'),
+        `structure:
+  - id: "base123456B"
+    type: "RichTextCard"
+manifest:
+  card_count: 1
+  resource_count: 0
+  resources: []
+`
+      );
+
+      await fs.writeFile(
+        path.join(cardDir, 'content/base123456B.yaml'),
+        `type: "MarkdownCard"
+data:
+  content_text: "hello"
+`
+      );
+
+      const result = await packer.validate(cardDir);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors?.some((e) => e.field === 'content.base123456B.type')).toBe(true);
+    });
   });
 
   describe('readMetadata', () => {

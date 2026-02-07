@@ -441,6 +441,19 @@ export interface IChromiumCore {
     handler: (viewId: string, data: unknown) => void
   ): () => void;
 
+  /**
+   * 注册本地 IPC 处理器
+   */
+  onIPC(channel: string, handler: (data: unknown) => unknown | Promise<unknown>): () => void;
+  /**
+   * 发送本地 IPC 消息
+   */
+  sendIPC(channel: string, data: unknown): void;
+  /**
+   * 调用 IPC 并获取响应
+   */
+  invokeIPC<T = unknown>(channel: string, data: unknown): Promise<T>;
+
   // ========== DevTools ==========
   /**
    * 打开开发者工具

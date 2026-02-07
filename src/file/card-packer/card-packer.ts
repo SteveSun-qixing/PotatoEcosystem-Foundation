@@ -270,6 +270,22 @@ export class CardPacker implements ICardPacker {
         }
       }
 
+      const getContentSize = (content: FileData['content']): number => {
+        if (typeof content === 'string') {
+          return Buffer.byteLength(content, 'utf-8');
+        }
+        if (content instanceof ArrayBuffer) {
+          return content.byteLength;
+        }
+        if (content instanceof Uint8Array) {
+          return content.byteLength;
+        }
+        return 0;
+      };
+
+      fileCount = files.length;
+      totalSize = files.reduce((sum, file) => sum + getContentSize(file.content), 0);
+
       reportProgress('collecting', 60, `Collected ${fileCount} files`);
 
       // 4. 生成文件信息（如果需要）
@@ -647,6 +663,46 @@ export class CardPacker implements ICardPacker {
                 await fs.access(configPath);
               } catch {
                 warnings.push(`Base card config not found: content/${card.id}.yaml`);
+                continue;
+              }
+
+              try {
+                const contentYaml = await fs.readFile(configPath, 'utf-8');
+                const contentDoc = this._serializer.parseYAML<Record<string, unknown>>(contentYaml);
+                const contentType = typeof contentDoc.type === 'string' ? contentDoc.type.trim() : '';
+                const contentData = contentDoc.data;
+
+                if (!contentType) {
+                  errors.push({
+                    field: `content.${card.id}.type`,
+                    message: 'Base card content must include non-empty type',
+                    code: 'PACK-1004',
+                  });
+                }
+
+                if (!this._isPlainObject(contentData)) {
+                  errors.push({
+                    field: `content.${card.id}.data`,
+                    message: 'Base card content must include data object',
+                    code: 'PACK-1004',
+                  });
+                }
+
+                if (contentType && card.type && contentType !== card.type) {
+                  errors.push({
+                    field: `content.${card.id}.type`,
+                    message: `Base card type mismatch: structure=${card.type}, content=${contentType}`,
+                    code: 'PACK-1004',
+                  });
+                }
+              } catch (contentError) {
+                errors.push({
+                  field: `content.${card.id}`,
+                  message: `Invalid base card content format: ${
+                    contentError instanceof Error ? contentError.message : 'Unknown error'
+                  }`,
+                  code: 'PACK-1004',
+                });
               }
             }
           }
@@ -810,6 +866,10 @@ export class CardPacker implements ICardPacker {
     } else {
       return createHash('sha256').update(content as Buffer).digest('hex');
     }
+  }
+
+  private _isPlainObject(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
   }
 
   /**
