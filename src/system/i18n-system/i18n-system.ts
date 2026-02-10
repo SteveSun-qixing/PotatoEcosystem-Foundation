@@ -41,6 +41,11 @@ export interface I18nSystemOptions {
 }
 
 /**
+ * 语言变更回调类型
+ */
+export type LanguageChangeHandler = (lang: SupportedLanguage) => void;
+
+/**
  * I18nSystem 多语言系统实现
  */
 export class I18nSystem implements II18nSystem {
@@ -48,6 +53,7 @@ export class I18nSystem implements II18nSystem {
   private vocabulary: Map<string, LanguageTranslations> = new Map();
   private enableFallback: boolean;
   private onMissingTranslation: (code: string, lang: SupportedLanguage) => string;
+  private languageChangeHandlers: Set<LanguageChangeHandler> = new Set();
 
   constructor(options?: I18nSystemOptions) {
     this.currentLanguage = options?.defaultLanguage ?? DEFAULT_LANGUAGE;
@@ -80,7 +86,13 @@ export class I18nSystem implements II18nSystem {
     if (!SUPPORTED_LANGUAGES.includes(lang)) {
       throw new Error(`Unsupported language: ${lang}`);
     }
+    const previousLang = this.currentLanguage;
     this.currentLanguage = lang;
+
+    // 只在语言实际变化时通知
+    if (previousLang !== lang) {
+      this._notifyLanguageChange(lang);
+    }
   }
 
   /**
@@ -171,6 +183,33 @@ export class I18nSystem implements II18nSystem {
    */
   clear(): void {
     this.vocabulary.clear();
+  }
+
+  /**
+   * 注册语言变更回调
+   */
+  onLanguageChange(handler: LanguageChangeHandler): void {
+    this.languageChangeHandlers.add(handler);
+  }
+
+  /**
+   * 取消语言变更回调
+   */
+  offLanguageChange(handler: LanguageChangeHandler): void {
+    this.languageChangeHandlers.delete(handler);
+  }
+
+  /**
+   * 通知语言变更
+   */
+  private _notifyLanguageChange(lang: SupportedLanguage): void {
+    for (const handler of this.languageChangeHandlers) {
+      try {
+        handler(lang);
+      } catch (error) {
+        console.error('[I18nSystem] Language change handler error:', error);
+      }
+    }
   }
 
   /**

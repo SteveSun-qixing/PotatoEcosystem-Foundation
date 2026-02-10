@@ -400,6 +400,11 @@ export interface II18nSystem {
   registerVocabulary(code: string, translations: LanguageTranslations): void;
 
   /**
+   * 批量注册词汇
+   */
+  registerVocabularyBatch(vocabularies: Record<string, LanguageTranslations>): void;
+
+  /**
    * 批量翻译
    */
   translateBatch(codes: string[]): Record<string, string>;
@@ -408,6 +413,31 @@ export interface II18nSystem {
    * 检查词汇是否存在
    */
   hasVocabulary(code: string): boolean;
+
+  /**
+   * 获取所有词汇代码
+   */
+  getAllCodes(): string[];
+
+  /**
+   * 导出词汇表
+   */
+  exportVocabulary(): VocabularyData;
+
+  /**
+   * 清空词汇表
+   */
+  clear(): void;
+
+  /**
+   * 注册语言变更回调
+   */
+  onLanguageChange(handler: (lang: SupportedLanguage) => void): void;
+
+  /**
+   * 取消语言变更回调
+   */
+  offLanguageChange(handler: (lang: SupportedLanguage) => void): void;
 }
 
 // ============================================================================
