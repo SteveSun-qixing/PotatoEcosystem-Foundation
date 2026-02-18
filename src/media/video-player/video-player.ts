@@ -3,282 +3,534 @@
  * @module @chips/foundation/media/video-player/video-player
  */
 
-/**
- * 播放状态
- */
-export type VideoPlaybackState = 'idle' | 'loading' | 'playing' | 'paused' | 'ended' | 'error';
+import { ChipsError, ErrorCodes } from '../../core/errors';
+import {
+  DPlayerVideoEngineAdapter,
+  NativeVideoEngineAdapter,
+  type VideoEngineAdapter,
+} from './video-engine-adapter';
+import type {
+  VideoEvents,
+  VideoPlaybackState,
+  VideoPlayerConfig,
+  VideoPlayerSnapshot,
+  VideoSource,
+  VideoSubtitleTrack,
+} from './types';
 
-/**
- * 视频播放器配置
- */
-export interface VideoPlayerConfig {
-  /** 容器 */
-  container: HTMLElement;
-  /** 视频源 */
-  src?: string;
-  /** 是否自动播放 */
-  autoplay?: boolean;
-  /** 是否循环 */
-  loop?: boolean;
-  /** 初始音量 */
-  volume?: number;
-  /** 是否显示控件 */
-  controls?: boolean;
-  /** 海报图 */
-  poster?: string;
-}
+const DEFAULT_PROGRESS_THROTTLE_MS = 2000;
 
-/**
- * 视频事件
- */
-export interface VideoEvents {
-  onPlay?: () => void;
-  onPause?: () => void;
-  onEnded?: () => void;
-  onTimeUpdate?: (currentTime: number, duration: number) => void;
-  onProgress?: (buffered: number) => void;
-  onError?: (error: Error) => void;
-  onFullscreenChange?: (isFullscreen: boolean) => void;
-}
-
-/**
- * VideoPlayer 视频播放器
- */
 export class VideoPlayer {
-  private container: HTMLElement;
-  private video: HTMLVideoElement;
+  private engine: VideoEngineAdapter | null = null;
   private state: VideoPlaybackState = 'idle';
   private events: VideoEvents = {};
+  private disposed = false;
+  private readonly initPromise: Promise<void>;
+  private subtitleTracks: VideoSubtitleTrack[] = [];
+  private currentSubtitleTrackId: string | null = null;
+  private unbindHandlers: Array<() => void> = [];
+  private saveProgressTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(config: VideoPlayerConfig) {
-    this.container = config.container;
-
-    this.video = document.createElement('video');
-    this.video.style.width = '100%';
-    this.video.style.height = '100%';
-
-    if (config.src) {
-      this.video.src = config.src;
-    }
-
-    this.video.autoplay = config.autoplay ?? false;
-    this.video.loop = config.loop ?? false;
-    this.video.volume = config.volume ?? 1;
-    this.video.controls = config.controls ?? false;
-
-    if (config.poster) {
-      this.video.poster = config.poster;
-    }
-
-    this.container.appendChild(this.video);
-    this.setupEvents();
+  constructor(private readonly config: VideoPlayerConfig) {
+    this.events = { ...config.events };
+    this.subtitleTracks = [...(config.subtitles ?? [])];
+    this.initPromise = this.initialize();
   }
 
-  /**
-   * 播放
-   */
+  async ready(): Promise<void> {
+    await this.initPromise;
+  }
+
   async play(): Promise<void> {
-    try {
-      await this.video.play();
-    } catch (error) {
-      this.events.onError?.(error as Error);
-      throw error;
+    await this.withEngine(async (engine) => {
+      await engine.play();
+    });
+  }
+
+  async pause(): Promise<void> {
+    await this.withEngine((engine) => {
+      engine.pause();
+    });
+  }
+
+  async stop(): Promise<void> {
+    await this.withEngine((engine) => {
+      engine.pause();
+      engine.seek(0);
+      this.transitionTo('idle');
+    });
+  }
+
+  async seek(time: number): Promise<void> {
+    this.validateFiniteNumber('time', time);
+    await this.withEngine((engine) => {
+      engine.seek(time);
+    });
+  }
+
+  async setSource(source: VideoSource): Promise<void> {
+    if (!source.url || typeof source.url !== 'string') {
+      throw new ChipsError(ErrorCodes.INVALID_INPUT, 'Video source url is required');
+    }
+
+    await this.withEngine(async (engine) => {
+      this.transitionTo('loading');
+      await engine.setSource(source);
+      await this.restoreProgress();
+    });
+  }
+
+  async setVolume(volume: number): Promise<void> {
+    this.validateFiniteNumber('volume', volume);
+    await this.withEngine((engine) => {
+      engine.setVolume(volume);
+    });
+  }
+
+  getVolume(): number {
+    return this.engine?.getVolume() ?? 0;
+  }
+
+  async setMuted(muted: boolean): Promise<void> {
+    await this.withEngine((engine) => {
+      engine.setMuted(muted);
+    });
+  }
+
+  isMuted(): boolean {
+    return this.engine?.isMuted() ?? false;
+  }
+
+  async setPlaybackRate(rate: number): Promise<void> {
+    this.validateFiniteNumber('rate', rate);
+    await this.withEngine((engine) => {
+      engine.setPlaybackRate(rate);
+    });
+  }
+
+  getPlaybackRate(): number {
+    return this.engine?.getPlaybackRate() ?? 1;
+  }
+
+  async requestFullscreen(): Promise<void> {
+    await this.withEngine(async (engine) => {
+      await engine.requestFullscreen();
+    });
+  }
+
+  async exitFullscreen(): Promise<void> {
+    await this.withEngine(async (engine) => {
+      await engine.exitFullscreen();
+    });
+  }
+
+  isFullscreen(): boolean {
+    return this.engine?.isFullscreen() ?? false;
+  }
+
+  async requestPictureInPicture(): Promise<void> {
+    await this.withEngine(async (engine) => {
+      const video = engine.videoElement as HTMLVideoElement & {
+        requestPictureInPicture?: () => Promise<void>;
+      };
+      if (video.requestPictureInPicture) {
+        await video.requestPictureInPicture();
+      }
+    });
+  }
+
+  async exitPictureInPicture(): Promise<void> {
+    const doc = document as Document & {
+      exitPictureInPicture?: () => Promise<void>;
+    };
+
+    if (doc.exitPictureInPicture) {
+      await doc.exitPictureInPicture();
     }
   }
 
-  /**
-   * 暂停
-   */
-  pause(): void {
-    this.video.pause();
-  }
-
-  /**
-   * 停止
-   */
-  stop(): void {
-    this.video.pause();
-    this.video.currentTime = 0;
-    this.state = 'idle';
-  }
-
-  /**
-   * 跳转
-   */
-  seek(time: number): void {
-    this.video.currentTime = Math.max(0, Math.min(time, this.video.duration || 0));
-  }
-
-  /**
-   * 设置音量
-   */
-  setVolume(volume: number): void {
-    this.video.volume = Math.max(0, Math.min(1, volume));
-  }
-
-  /**
-   * 获取音量
-   */
-  getVolume(): number {
-    return this.video.volume;
-  }
-
-  /**
-   * 静音/取消静音
-   */
-  toggleMute(): void {
-    this.video.muted = !this.video.muted;
-  }
-
-  /**
-   * 是否静音
-   */
-  isMuted(): boolean {
-    return this.video.muted;
-  }
-
-  /**
-   * 获取当前时间
-   */
   getCurrentTime(): number {
-    return this.video.currentTime;
+    return this.engine?.videoElement.currentTime ?? 0;
   }
 
-  /**
-   * 获取时长
-   */
   getDuration(): number {
-    return this.video.duration || 0;
+    return this.engine?.videoElement.duration ?? 0;
   }
 
-  /**
-   * 获取播放状态
-   */
+  getBuffered(): number {
+    const ranges = this.engine?.videoElement.buffered;
+    if (!ranges || ranges.length === 0) {
+      return 0;
+    }
+
+    return ranges.end(ranges.length - 1);
+  }
+
   getState(): VideoPlaybackState {
     return this.state;
   }
 
-  /**
-   * 设置播放速度
-   */
-  setPlaybackRate(rate: number): void {
-    this.video.playbackRate = rate;
+  getEngineType(): 'dplayer' | 'native' | null {
+    return this.engine?.type ?? null;
   }
 
-  /**
-   * 获取播放速度
-   */
-  getPlaybackRate(): number {
-    return this.video.playbackRate;
+  getVideoElement(): HTMLVideoElement | null {
+    return this.engine?.videoElement ?? null;
   }
 
-  /**
-   * 进入全屏
-   */
-  async enterFullscreen(): Promise<void> {
-    if (this.video.requestFullscreen) {
-      await this.video.requestFullscreen();
-    }
-  }
-
-  /**
-   * 退出全屏
-   */
-  async exitFullscreen(): Promise<void> {
-    if (document.exitFullscreen) {
-      await document.exitFullscreen();
-    }
-  }
-
-  /**
-   * 是否全屏
-   */
-  isFullscreen(): boolean {
-    return document.fullscreenElement === this.video;
-  }
-
-  /**
-   * 进入画中画
-   */
-  async enterPictureInPicture(): Promise<void> {
-    if ('requestPictureInPicture' in this.video) {
-      await this.video.requestPictureInPicture();
-    }
-  }
-
-  /**
-   * 设置视频源
-   */
-  setSrc(src: string): void {
-    this.video.src = src;
-    this.state = 'idle';
-  }
-
-  /**
-   * 绑定事件
-   */
   on(events: VideoEvents): void {
     this.events = { ...this.events, ...events };
   }
 
-  /**
-   * 获取视频元素
-   */
-  getElement(): HTMLVideoElement {
-    return this.video;
+  loadSubtitles(subtitles: VideoSubtitleTrack[], defaultSubtitleId?: string): void {
+    this.subtitleTracks = subtitles;
+
+    if (defaultSubtitleId) {
+      this.currentSubtitleTrackId = defaultSubtitleId;
+    } else {
+      this.currentSubtitleTrackId =
+        subtitles.find((track) => track.default)?.id ?? subtitles[0]?.id ?? null;
+    }
+
+    this.applySubtitleTracks();
   }
 
-  /**
-   * 设置事件
-   */
-  private setupEvents(): void {
-    this.video.addEventListener('loadstart', () => {
-      this.state = 'loading';
+  setSubtitleTrack(trackId: string | null): void {
+    this.currentSubtitleTrackId = trackId;
+    this.applySubtitleTracks();
+    this.events.onSubtitleChange?.(this.getCurrentSubtitleTrack());
+  }
+
+  getSubtitleTracks(): VideoSubtitleTrack[] {
+    return [...this.subtitleTracks];
+  }
+
+  getCurrentSubtitleTrack(): VideoSubtitleTrack | null {
+    if (!this.currentSubtitleTrackId) {
+      return null;
+    }
+
+    return this.subtitleTracks.find((track) => track.id === this.currentSubtitleTrackId) ?? null;
+  }
+
+  saveProgress(): void {
+    if (!this.engine) {
+      return;
+    }
+
+    const key = this.resolveProgressStorageKey();
+    if (!key) {
+      return;
+    }
+
+    const currentTime = this.engine.videoElement.currentTime;
+    if (!Number.isFinite(currentTime) || currentTime <= 0) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          time: currentTime,
+          updatedAt: Date.now(),
+        })
+      );
+    } catch {
+      // 忽略浏览器隐私模式等场景导致的写入失败
+    }
+  }
+
+  restoreProgress(): Promise<boolean> {
+    if (!this.engine) {
+      return Promise.resolve(false);
+    }
+
+    const key = this.resolveProgressStorageKey();
+    if (!key) {
+      return Promise.resolve(false);
+    }
+
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) {
+        return Promise.resolve(false);
+      }
+
+      const parsed = JSON.parse(raw) as { time?: number };
+      if (!parsed || !Number.isFinite(parsed.time) || !parsed.time || parsed.time < 0) {
+        return Promise.resolve(false);
+      }
+
+      this.engine.seek(parsed.time);
+      return Promise.resolve(true);
+    } catch {
+      return Promise.resolve(false);
+    }
+  }
+
+  toSnapshot(id: string): VideoPlayerSnapshot {
+    const currentSource = this.engine?.videoElement.currentSrc;
+
+    return {
+      id,
+      engine: this.engine?.type ?? 'native',
+      state: this.state,
+      sourceUrl: currentSource && currentSource.length > 0 ? currentSource : undefined,
+      currentTime: this.getCurrentTime(),
+      duration: this.getDuration(),
+      buffered: this.getBuffered(),
+      volume: this.getVolume(),
+      muted: this.isMuted(),
+      playbackRate: this.getPlaybackRate(),
+      fullscreen: this.isFullscreen(),
+      subtitleTrack: this.getCurrentSubtitleTrack(),
+    };
+  }
+
+  async destroy(): Promise<void> {
+    if (this.disposed) {
+      return;
+    }
+
+    await this.ready();
+
+    this.disposed = true;
+    this.transitionTo('destroyed');
+
+    if (this.saveProgressTimer) {
+      clearTimeout(this.saveProgressTimer);
+      this.saveProgressTimer = null;
+    }
+
+    for (const unbind of this.unbindHandlers) {
+      unbind();
+    }
+    this.unbindHandlers = [];
+
+    this.engine?.destroy();
+    this.engine = null;
+  }
+
+  private async initialize(): Promise<void> {
+    this.transitionTo('loading');
+
+    const preferredEngine = this.config.engine ?? 'dplayer';
+    const allowFallback = this.config.allowNativeFallback ?? true;
+
+    if (preferredEngine === 'dplayer') {
+      try {
+        this.engine = await DPlayerVideoEngineAdapter.create(this.config);
+      } catch (error) {
+        if (!allowFallback) {
+          throw this.wrapUnknownError(error, 'Failed to initialize DPlayer engine');
+        }
+
+        const wrapped = this.wrapUnknownError(
+          error,
+          'DPlayer initialization failed, switched to native engine'
+        );
+        this.config.onFallback?.('dplayer-unavailable', wrapped);
+        this.engine = new NativeVideoEngineAdapter(this.config);
+      }
+    } else {
+      this.engine = new NativeVideoEngineAdapter(this.config);
+    }
+
+    this.bindVideoEvents();
+    this.applySubtitleTracks();
+
+    if (this.config.source) {
+      await this.restoreProgress();
+    }
+
+    this.transitionTo('ready');
+    this.events.onReady?.();
+
+    if (this.config.autoplay) {
+      await this.play();
+    }
+  }
+
+  private bindVideoEvents(): void {
+    if (!this.engine) {
+      return;
+    }
+
+    const video = this.engine.videoElement;
+
+    const bind = (target: EventTarget, event: string, listener: EventListener): void => {
+      target.addEventListener(event, listener);
+      this.unbindHandlers.push(() => {
+        target.removeEventListener(event, listener);
+      });
+    };
+
+    bind(video, 'loadstart', () => {
+      this.transitionTo('loading');
     });
 
-    this.video.addEventListener('play', () => {
-      this.state = 'playing';
+    bind(video, 'loadedmetadata', () => {
+      if (this.state !== 'playing') {
+        this.transitionTo('ready');
+      }
+    });
+
+    bind(video, 'play', () => {
+      this.transitionTo('playing');
       this.events.onPlay?.();
     });
 
-    this.video.addEventListener('pause', () => {
-      if (this.state !== 'idle') {
-        this.state = 'paused';
-        this.events.onPause?.();
+    bind(video, 'pause', () => {
+      if (this.state !== 'idle' && this.state !== 'ended') {
+        this.transitionTo('paused');
       }
+      this.events.onPause?.();
     });
 
-    this.video.addEventListener('ended', () => {
-      this.state = 'ended';
+    bind(video, 'ended', () => {
+      this.transitionTo('ended');
+      this.saveProgress();
       this.events.onEnded?.();
     });
 
-    this.video.addEventListener('timeupdate', () => {
-      this.events.onTimeUpdate?.(this.video.currentTime, this.video.duration);
+    bind(video, 'timeupdate', () => {
+      this.events.onTimeUpdate?.(video.currentTime, video.duration || 0);
+      this.scheduleProgressSave();
     });
 
-    this.video.addEventListener('progress', () => {
-      if (this.video.buffered.length > 0) {
-        const buffered = this.video.buffered.end(this.video.buffered.length - 1);
-        this.events.onProgress?.(buffered);
-      }
+    bind(video, 'progress', () => {
+      this.events.onProgress?.(this.getBuffered());
     });
 
-    this.video.addEventListener('error', () => {
-      this.state = 'error';
-      this.events.onError?.(new Error('Video playback error'));
+    bind(video, 'volumechange', () => {
+      this.events.onVolumeChange?.(video.volume, video.muted);
     });
 
-    document.addEventListener('fullscreenchange', () => {
+    bind(video, 'ratechange', () => {
+      this.events.onRateChange?.(video.playbackRate);
+    });
+
+    bind(video, 'error', () => {
+      this.transitionTo('error');
+      const mediaErrorCode = video.error?.code;
+      const error = new ChipsError(
+        ErrorCodes.RESOURCE_UNAVAILABLE,
+        `Video playback error${typeof mediaErrorCode === 'number' ? ` (code: ${mediaErrorCode})` : ''}`
+      );
+      this.events.onError?.(error);
+    });
+
+    bind(document, 'fullscreenchange', () => {
       this.events.onFullscreenChange?.(this.isFullscreen());
     });
   }
 
-  /**
-   * 销毁
-   */
-  destroy(): void {
-    this.stop();
-    this.video.remove();
+  private applySubtitleTracks(): void {
+    if (!this.engine) {
+      return;
+    }
+
+    const video = this.engine.videoElement;
+    const existingTracks = Array.from(video.querySelectorAll('track[data-chips-subtitle="1"]'));
+    for (const track of existingTracks) {
+      track.remove();
+    }
+
+    for (const track of this.subtitleTracks) {
+      const element = document.createElement('track');
+      element.dataset.chipsSubtitle = '1';
+      element.kind = track.kind ?? 'subtitles';
+      element.label = track.label;
+      element.srclang = track.language;
+      element.src = track.src;
+      element.default = track.id === this.currentSubtitleTrackId;
+      video.appendChild(element);
+    }
+
+    const textTracks = Array.from(video.textTracks);
+    for (const textTrack of textTracks) {
+      const match = this.subtitleTracks.find(
+        (candidate) =>
+          candidate.label === textTrack.label && candidate.language === textTrack.language
+      );
+
+      textTrack.mode = match && match.id === this.currentSubtitleTrackId ? 'showing' : 'disabled';
+    }
+  }
+
+  private scheduleProgressSave(): void {
+    if (this.saveProgressTimer) {
+      return;
+    }
+
+    this.saveProgressTimer = setTimeout(() => {
+      this.saveProgressTimer = null;
+      this.saveProgress();
+    }, this.config.progressSaveThrottleMs ?? DEFAULT_PROGRESS_THROTTLE_MS);
+  }
+
+  private resolveProgressStorageKey(): string | null {
+    if (this.config.progressStorageKey) {
+      return this.config.progressStorageKey;
+    }
+
+    const currentSource = this.engine?.videoElement.currentSrc;
+    const sourceUrl =
+      currentSource && currentSource.length > 0 ? currentSource : this.config.source?.url;
+    if (!sourceUrl) {
+      return null;
+    }
+
+    return `chips.video.progress:${sourceUrl}`;
+  }
+
+  private transitionTo(nextState: VideoPlaybackState): void {
+    if (this.state === nextState) {
+      return;
+    }
+
+    this.state = nextState;
+    this.events.onStateChange?.(nextState);
+  }
+
+  private async withEngine(
+    handler: (engine: VideoEngineAdapter) => void | Promise<void>
+  ): Promise<void> {
+    if (this.disposed) {
+      throw new ChipsError(ErrorCodes.RESOURCE_UNAVAILABLE, 'VideoPlayer has been destroyed');
+    }
+
+    await this.ready();
+
+    if (!this.engine) {
+      throw new ChipsError(ErrorCodes.RESOURCE_UNAVAILABLE, 'Video engine is unavailable');
+    }
+
+    try {
+      await handler(this.engine);
+    } catch (error) {
+      const wrapped = this.wrapUnknownError(error, 'Video operation failed');
+      this.events.onError?.(wrapped);
+      throw wrapped;
+    }
+  }
+
+  private validateFiniteNumber(field: string, value: number): void {
+    if (!Number.isFinite(value)) {
+      throw new ChipsError(ErrorCodes.INVALID_INPUT, `${field} must be a finite number`);
+    }
+  }
+
+  private wrapUnknownError(error: unknown, fallbackMessage: string): ChipsError {
+    if (error instanceof ChipsError) {
+      return error;
+    }
+
+    if (error instanceof Error) {
+      return new ChipsError(ErrorCodes.INTERNAL_ERROR, error.message, undefined, error);
+    }
+
+    return new ChipsError(ErrorCodes.INTERNAL_ERROR, fallbackMessage, { error });
   }
 }
