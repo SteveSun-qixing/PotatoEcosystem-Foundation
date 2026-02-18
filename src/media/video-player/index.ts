@@ -3,4 +3,6 @@
  * @module @chips/foundation/media/video-player
  */
 
+export * from './types';
 export * from './video-player';
+export * from './video-player-manager';

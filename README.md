@@ -203,7 +203,7 @@ const result = await Core.request({
 - **Chromium**: 网页渲染引擎
 - **Electron**: 桌面应用框架
 - **Three.js**: 3D渲染库
-- **video.js**: 视频播放库
+- **DPlayer**: 视频播放库（默认引擎，支持原生降级）
 - **highlight.js**: 代码高亮库
 - **marked**: Markdown解析库
 - **JSZip**: ZIP文件处理库
