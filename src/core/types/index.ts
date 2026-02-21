@@ -268,22 +268,30 @@ export interface ThemeConfig {
  * 主题层级配置
  */
 export interface ThemeHierarchyConfig {
-  /** 组件级主题 */
-  componentTheme?: string;
-  /** 卡片级主题 */
-  cardTheme?: string;
+  /** 组件级主题（最高优先级） */
+  component?: string;
+  /** 基础卡片级主题 */
+  baseCard?: string;
+  /** 复合卡片级主题（阶段10统一口径） */
+  compositeCard?: string;
+  /** 复合卡片级主题（Host 路由兼容别名） */
+  card?: string;
+  /** 箱子级主题 */
+  box?: string;
   /** 应用级主题 */
-  appTheme?: string;
-  /** 全局主题 */
-  globalTheme?: string;
+  app?: string;
+  /** 全局主题（最低优先级） */
+  global?: string;
 }
 
 /**
  * 主题定义
  */
 export interface Theme {
-  /** 主题 ID（格式：发行商:主题名） */
-  id: string;
+  /** 主题 ID（系统技术主键） */
+  themeId: string;
+  /** 主题 ID 兼容别名（等同于 themeId） */
+  id?: string;
   /** 主题名称 */
   name: string;
   /** 版本 */
