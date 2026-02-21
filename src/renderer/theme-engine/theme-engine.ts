@@ -8,6 +8,9 @@
 
 import type { Theme, ThemeHierarchyConfig } from '../../core/types';
 
+export const DEFAULT_THEME_ID = 'chips-official.default-theme';
+export const DEFAULT_DARK_THEME_ID = 'chips-official.dark-theme';
+
 /**
  * 主题加载选项
  */
@@ -49,8 +52,9 @@ export class ThemeEngine {
    * 注册主题
    */
   registerTheme(theme: Theme): void {
-    this.themes.set(theme.id, theme);
-    this._notifyEvent('registered', theme.id);
+    const normalizedTheme = this._normalizeTheme(theme);
+    this.themes.set(normalizedTheme.themeId, normalizedTheme);
+    this._notifyEvent('registered', normalizedTheme.themeId);
   }
 
   /**
@@ -67,9 +71,9 @@ export class ThemeEngine {
 
     // 如果当前活跃主题被注销，回退
     if (this.activeTheme === themeId) {
-      const defaultTheme = this.themes.get('chipshub:default');
+      const defaultTheme = this.themes.get(DEFAULT_THEME_ID);
       if (defaultTheme) {
-        this.activeTheme = defaultTheme.id;
+        this.activeTheme = defaultTheme.themeId;
       } else {
         this.activeTheme = null;
       }
@@ -138,7 +142,8 @@ export class ThemeEngine {
 
       // 4. 添加新主题类名
       target.classList.add(`theme-${theme.type}`);
-      target.setAttribute('data-theme', theme.id);
+      target.setAttribute('data-theme', theme.themeId);
+      target.setAttribute('data-theme-id', theme.themeId);
     } else {
       // 非浏览器环境：仅更新内部 CSS 变量映射
       this.cssVariables.clear();
@@ -161,14 +166,17 @@ export class ThemeEngine {
   /**
    * 解析主题层级
    *
-   * 按优先级解析：组件级 > 卡片级 > 应用级 > 全局
+   * 按优先级解析：组件 > 基础卡片 > 复合卡片 > 箱子 > 应用 > 全局
    */
   resolveThemeHierarchy(config: ThemeHierarchyConfig): Theme | undefined {
     const themeId =
-      config.componentTheme ??
-      config.cardTheme ??
-      config.appTheme ??
-      config.globalTheme;
+      config.component ??
+      config.baseCard ??
+      config.compositeCard ??
+      config.card ??
+      config.box ??
+      config.app ??
+      config.global;
 
     if (!themeId) {
       return undefined;
@@ -219,7 +227,8 @@ export class ThemeEngine {
    */
   createDefaultTheme(): Theme {
     return {
-      id: 'chipshub:default',
+      themeId: DEFAULT_THEME_ID,
+      id: DEFAULT_THEME_ID,
       name: 'Default Theme',
       version: '1.0.0',
       type: 'light',
@@ -245,7 +254,8 @@ export class ThemeEngine {
    */
   createDarkTheme(): Theme {
     return {
-      id: 'chipshub:dark',
+      themeId: DEFAULT_DARK_THEME_ID,
+      id: DEFAULT_DARK_THEME_ID,
       name: 'Dark Theme',
       version: '1.0.0',
       type: 'dark',
@@ -277,6 +287,19 @@ export class ThemeEngine {
         console.error(`[ThemeEngine] Event handler error for ${event}:`, error);
       }
     }
+  }
+
+  private _normalizeTheme(theme: Theme): Theme {
+    const themeId = theme.themeId || theme.id;
+    if (!themeId) {
+      throw new Error('Theme registration failed: themeId is required');
+    }
+
+    return {
+      ...theme,
+      themeId,
+      id: themeId,
+    };
   }
 }
 
